@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>小程序反编译工具_AppletDeAnalyze_v1.1</title>
+  <style>
+    /* 全局样式 */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      color: #333;
+      background-color: #f5f5f5;
+    }
+
+    /* 容器布局 */
+    .container {
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* 主内容区 */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* 顶部导航栏 */
+    .top-bar {
+      height: 60px;
+      background-color: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      align-items: center;
+      padding: 0 20px;
+      justify-content: space-between;
+      flex-shrink: 0;
+    }
+
+    .top-bar-title {
+      font-size: 18px;
+      font-weight: 500;
+      color: #2c3e50;
+    }
+
+    .top-bar-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    /* 工作区 */
+    .workspace {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* 左侧工作区 */
+    .workspace-left {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      background-color: #f9f9f9;
+    }
+
+    /* 右侧工作区 */
+    .workspace-right {
+      width: 300px;
+      background-color: #fff;
+      border-left: 1px solid #e0e0e0;
+      padding: 20px;
+      overflow-y: auto;
+      flex-shrink: 0;
+    }
+
+    /* 目录选择区 */
+    .directory-section {
+      margin-bottom: 30px;
+    }
+
+    .section-title {
+      font-size: 16px;
+      font-weight: 500;
+      margin-bottom: 15px;
+      color: #2c3e50;
+    }
+
+    .directory-selector {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .directory-path {
+      flex: 1;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background-color: #fff;
+    }
+
+    /* 小程序列表区 */
+    .applet-list {
+      margin-top: 20px;
+    }
+
+    .applet-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 20px;
+    }
+
+    .applet-card {
+      background-color: #fff;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      transition: box-shadow 0.2s, transform 0.2s;
+    }
+
+    .applet-card:hover {
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+      transform: translateY(-2px);
+    }
+
+    .applet-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+
+    .applet-card-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      object-fit: cover;
+      flex-shrink: 0;
+    }
+
+    .applet-card-info {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .applet-card-title {
+      font-size: 16px;
+      font-weight: 500;
+      color: #2c3e50;
+      margin-bottom: 4px;
+    }
+
+    .applet-card-appid {
+      font-size: 12px;
+      color: #999;
+    }
+
+    .applet-card-description {
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 12px;
+      line-height: 1.4;
+    }
+
+    .applet-card-meta {
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 12px;
+    }
+
+    .applet-card-meta {
+      font-size: 12px;
+      color: #999;
+      margin-bottom: 12px;
+    }
+
+    .applet-card-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    /* 参数配置面板 */
+    .config-panel {
+      margin-bottom: 20px;
+    }
+
+    .config-group {
+      margin-bottom: 20px;
+    }
+
+    .config-group-title {
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 10px;
+      color: #2c3e50;
+    }
+
+    .config-item {
+      margin-bottom: 12px;
+    }
+
+    .config-label {
+      display: block;
+      font-size: 13px;
+      color: #666;
+      margin-bottom: 4px;
+    }
+
+    .config-input {
+      width: 100%;
+      padding: 8px 12px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 14px;
+    }
+
+    .config-checkbox {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .config-checkbox input {
+      width: auto;
+    }
+
+    .search-depth-container {
+      margin-top: 10px;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .search-depth-input {
+      width: 60px;
+      padding: 4px;
+    }
+
+    /* 按钮样式 */
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.2s;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background-color: #3498db;
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background-color: #2980b9;
+    }
+
+    .btn-secondary {
+      background-color: #95a5a6;
+      color: #fff;
+    }
+
+    .btn-secondary:hover {
+      background-color: #7f8c8d;
+    }
+
+    .btn-sm {
+      padding: 6px 12px;
+      font-size: 13px;
+    }
+
+    /* 状态消息 */
+    .status-message {
+      padding: 20px;
+      text-align: center;
+      color: #999;
+      background-color: #f9f9f9;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+
+    /* 加载动画 */
+    .loading {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 2px solid #f3f3f3;
+      border-top: 2px solid #3498db;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+
+    /* 响应式设计 */
+    @media (max-width: 768px) {
+      .workspace-right {
+        width: 250px;
+      }
+
+      .applet-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .workspace {
+        flex-direction: column;
+      }
+
+      .workspace-right {
+        width: 100%;
+        border-left: none;
+        border-top: 1px solid #e0e0e0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- 侧边栏已移除 -->
+
+    <!-- 主内容区 -->
+    <!-- <div class="main-content"> -->
+      <!-- 顶部导航栏 -->
+      <!-- <div class="top-bar"> -->
+        <!-- <div class="top-bar-title">小程序反编译工具</div> -->
+        <!-- <div class="top-bar-actions"> -->
+          <!-- 刷新和批量反编译功能暂时移除 -->
+        <!-- </div> -->
+      <!-- </div> -->
+
+      <!-- 工作区 -->
+      <div class="workspace">
+        <!-- 左侧工作区 -->
+        <div class="workspace-left">
+          <!-- 目录选择区 -->
+          <div class="directory-section">
+            <h3 class="section-title">目录管理</h3>
+            <div class="directory-selector">
+              <input type="text" class="directory-path" id="directoryPath" placeholder="选择小程序目录..." readonly>
+              <button class="btn btn-primary" onclick="selectDirectory()">选择</button>
+              <button class="btn btn-secondary" onclick="reloadDirectory()">重新加载</button>
+            </div>
+            <div class="search-depth-container">
+              搜索深度: <input type="number" id="searchDepth" value="5" min="1" max="10" class="search-depth-input">
+            </div>
+          </div>
+
+          <!-- 小程序列表区 -->
+          <div class="applet-list">
+            <h3 class="section-title">小程序列表</h3>
+            <div id="appletGrid" class="applet-grid">
+              <div class="status-message">
+                <p>请选择目录以开始分析</p>
+                <p style="font-size: 0.75rem; margin-top: 0.5rem;">支持递归搜索目录中的小程序</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧参数面板 -->
+        <div class="workspace-right">
+          <h3 class="section-title">参数配置</h3>
+          
+          <div class="config-panel">
+            <div class="config-group">
+              <div class="config-group-title">基本配置</div>
+              <div class="config-item">
+                <label class="config-label">输出目录</label>
+                <input type="text" class="config-input" id="outputDir" placeholder="默认: 程序根目录">
+              </div>
+            </div>
+
+            <div class="config-group">
+              <div class="config-group-title">高级配置</div>
+              <div class="config-item config-checkbox">
+                <input type="checkbox" id="formatCode" checked>
+                <label for="formatCode">代码格式化</label>
+              </div>
+              <div class="config-item config-checkbox">
+                <input type="checkbox" id="jsAnalysis">
+                <label for="jsAnalysis">JS分析</label>
+              </div>
+            </div>
+
+            <div class="config-group">
+              <div class="config-group-title">端口配置</div>
+              <div class="config-item">
+                <label class="config-label">分析端口</label>
+                <input type="number" class="config-input" id="analyzePort" value="8000" min="1" max="65535">
+              </div>
+              <div class="config-item">
+                <label class="config-label">代理端口</label>
+                <input type="number" class="config-input" id="proxyPort" value="8888" min="1" max="65535">
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 全局变量
+    let selectedDirectory = null;
+    let applets = [];
+    let decompiledApplets = new Set(); // 存储已反编译的小程序
+
+    // 从服务器加载已反编译的小程序
+    async function loadDecompiledApplets() {
+      try {
+        const result = await fetch('/api/get/decompiledApplets', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }).then(res => res.json());
+        
+        if (result.success) {
+          decompiledApplets = new Set(result.applets);
+        }
+      } catch (error) {
+        console.error('加载已反编译小程序失败:', error);
+        decompiledApplets = new Set();
+      }
+    }
+
+    // 保存已反编译的小程序到服务器
+    async function saveDecompiledApplets() {
+      try {
+        // 这个函数现在只是一个占位符，实际的保存操作会在添加或删除时单独调用API
+      } catch (error) {
+        console.error('保存已反编译小程序失败:', error);
+      }
+    }
+
+    // 添加已反编译小程序到服务器
+    async function addDecompiledApplet(appid) {
+      try {
+        await fetch('/api/add/decompiledApplet', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ appid })
+        });
+      } catch (error) {
+        console.error('添加已反编译小程序失败:', error);
+      }
+    }
+
+    // 从服务器移除已反编译小程序
+    async function removeDecompiledApplet(appid) {
+      try {
+        await fetch('/api/remove/decompiledApplet', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ appid })
+        });
+      } catch (error) {
+        console.error('移除已反编译小程序失败:', error);
+      }
+    }
+
+    // 页面加载完成后初始化
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initializeApp();
+    });
+
+    // 初始化WebSocket连接
+    function initWebSocket() {
+      const ws = new WebSocket('ws://localhost:3000');
+      
+      ws.onopen = () => {
+        console.log('WebSocket连接已建立');
+      };
+      
+      ws.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message.type === 'directory:changed') {
+            handleDirectoryChange(message.data);
+          }
+        } catch (error) {
+          console.error('解析WebSocket消息失败:', error);
+        }
+      };
+      
+      ws.onclose = () => {
+        console.log('WebSocket连接已关闭');
+        // 尝试重新连接
+        setTimeout(initWebSocket, 3000);
+      };
+      
+      ws.onerror = (error) => {
+        console.error('WebSocket错误:', error);
+      };
+    }
+
+    // 初始化应用
+    async function initializeApp() {
+      try {
+        // 初始化WebSocket连接
+        initWebSocket();
+        
+        // 加载已反编译的小程序
+        await loadDecompiledApplets();
+        
+        // 获取上次选择的目录
+        const result = await fetch('/api/get/lastSelectedDirectory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }).then(res => res.json());
+        
+        if (result.success && result.path) {
+          selectedDirectory = result.path;
+          document.getElementById('directoryPath').value = result.path;
+          
+          // 如果路径存在，自动加载
+          if (result.exists) {
+            await reloadDirectory();
+          } else {
+            console.log('上次选择的目录不存在:', result.path);
+          }
+        } else {
+          console.log('首次启动，无历史选择目录');
+        }
+        
+        // 监听输出目录配置变化，重新渲染小程序列表
+        document.getElementById('outputDir').addEventListener('input', () => {
+          if (applets.length > 0) {
+            renderAppletList(applets);
+          }
+        });
+      } catch (error) {
+        console.error('初始化应用失败:', error);
+      }
+    }
+
+    // 选择目录
+    async function selectDirectory() {
+      try {
+        // 由于不再使用Electron，这里使用prompt让用户手动输入目录路径
+        const directory = prompt('请输入小程序目录路径:');
+        if (directory) {
+          selectedDirectory = directory;
+          document.getElementById('directoryPath').value = directory;
+          
+          // 保存上次选择的目录
+          await fetch('/api/save/lastSelectedDirectory', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ directory })
+          });
+          
+          await reloadDirectory();
+        }
+      } catch (error) {
+        console.error('选择目录失败:', error);
+      }
+    }
+
+    // 处理目录变化
+    function handleDirectoryChange(result) {
+      if (result.success) {
+        const newApplets = result.applets;
+        const currentAppletIds = new Set(applets.map(a => a.appid));
+        const newAppletIds = new Set(newApplets.map(a => a.appid));
+        
+        // 找出新增的小程序
+        const addedApplets = newApplets.filter(newApplet => !currentAppletIds.has(newApplet.appid));
+        
+        if (addedApplets.length > 0) {
+          // 添加新的小程序到列表
+          applets = [...applets, ...addedApplets];
+          // 重新渲染小程序列表
+          renderAppletList(applets);
+          console.log(`目录已更新，发现 ${addedApplets.length} 个新的小程序`);
+        }
+      }
+    }
+
+    // 重新加载目录
+    async function reloadDirectory() {
+      if (!selectedDirectory) {
+        alert('请先选择目录');
+        return;
+      }
+
+      try {
+        const depth = parseInt(document.getElementById('searchDepth').value) || 5;
+        
+        // 显示加载状态
+        const appletGrid = document.getElementById('appletGrid');
+        appletGrid.innerHTML = `
+          <div class="status-message">
+            <div class="loading"></div>
+            <p style="margin-top: 10px;">正在分析目录...</p>
+          </div>
+        `;
+
+        // 分析目录
+        const result = await fetch('/api/analyze/directory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ dirPath: selectedDirectory })
+        }).then(res => res.json());
+        
+        if (result.success) {
+          applets = result.applets;
+          renderAppletList(applets);
+        } else {
+          appletGrid.innerHTML = `
+            <div class="status-message">
+              <p>分析失败: ${result.error}</p>
+            </div>
+          `;
+        }
+      } catch (error) {
+        console.error('重新加载目录失败:', error);
+        const appletGrid = document.getElementById('appletGrid');
+        appletGrid.innerHTML = `
+          <div class="status-message">
+            <p>加载失败: ${error.message}</p>
+          </div>
+        `;
+      }
+    }
+
+    // 渲染小程序列表
+    function renderAppletList(applets) {
+      const appletGrid = document.getElementById('appletGrid');
+      
+      if (applets.length === 0) {
+        appletGrid.innerHTML = `
+          <div class="status-message">
+            <p>未找到小程序</p>
+            <p style="font-size: 0.75rem; margin-top: 0.5rem;">请确保目录包含小程序文件</p>
+          </div>
+        `;
+        return;
+      }
+
+      // 按修改时间降序排序，后打开的小程序在前面
+      applets.sort((a, b) => new Date(b.modified) - new Date(a.modified));
+
+      appletGrid.innerHTML = '';
+      
+      // 获取用户配置的输出目录
+      const config = getConfig();
+      const userOutputDir = config.outputDir || '';
+      
+      applets.forEach(applet => {
+        const appletCard = document.createElement('div');
+        appletCard.className = 'applet-card';
+        appletCard.dataset.appid = applet.appid;
+        appletCard.dataset.path = applet.path;
+        appletCard.dataset.decompilePath = applet.decompilePath;
+        
+        // 修复路径中的反斜杠，避免JavaScript转义错误
+        const safePath = applet.path.replace(/\\/g, '\\\\');
+        const safeDecompilePath = applet.decompilePath.replace(/\\/g, '\\\\');
+        
+        // 生成输出目录路径（使用用户配置的输出目录）
+        let outputDirPath;
+        if (userOutputDir) {
+          // 如果用户指定了输出目录，使用用户指定的目录并自动添加appid子文件夹
+          const separator = userOutputDir.includes('/') ? '/' : '\\';
+          outputDirPath = userOutputDir.endsWith(separator) 
+            ? userOutputDir + applet.appid 
+            : userOutputDir + separator + applet.appid;
+        } else {
+          // 否则使用默认目录
+          outputDirPath = `output/${applet.appid}`;
+        }
+        const safeOutputDirPath = outputDirPath.replace(/\\/g, '\\\\');
+        
+        // 检查是否已反编译
+        const isDecompiled = decompiledApplets.has(applet.appid);
+        
+        // 生成头像HTML（处理本地文件路径和URL）
+        let avatarUrl = applet.avatar;
+        // 为本地文件路径添加 file:// 协议前缀
+        if (avatarUrl && !avatarUrl.startsWith('http') && !avatarUrl.startsWith('file://')) {
+          // 处理Windows路径，将反斜杠转换为正斜杠，并添加正确的file:///前缀
+          avatarUrl = 'file:///' + avatarUrl.replace(/\\/g, '/');
+        }
+        // 生成头像HTML，添加默认头像作为fallback
+        // 确保URL中的&不会被转义
+        const safeAvatarUrl = avatarUrl ? avatarUrl.replace(/&amp;/g, '&') : '';
+        // 输出调试信息
+        console.log('原始头像URL:', safeAvatarUrl);
+        // 使用代理端点加载头像，避免CORS问题
+        const proxyAvatarUrl = safeAvatarUrl ? `/api/avatar?url=${encodeURIComponent(safeAvatarUrl)}` : '';
+        console.log('代理头像URL:', proxyAvatarUrl);
+        // 生成头像HTML，添加错误处理和调试信息
+        const avatarHtml = proxyAvatarUrl 
+          ? `<img src="${proxyAvatarUrl}" class="applet-card-avatar" alt="${applet.name}" onload="console.log('头像加载成功:', this.src)" onerror="console.log('头像加载失败:', this.src); this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cGF0aCBkPSJNNTAgMTBDMjIuNCAxMCAxMCAzMi40IDEwIDYwczEyLjQgNTAgMzAgNTA1MCAwIDUwLTEyLjQgNTAtMzAgNTAtNTAtMTIuNC01MC0zMHoiIGZpbGw9IiMwMDAiLz48cGF0aCBkPSJNNTAgMzBDNjAuNSAzMCA3MCA0MC41IDcwIDU1czEtMTAgLTAtMjVTMzkuNSAzMCA1MCAzM3oiIGZpbGw9IiMzNzlhZDUiLz48L3N2Zz4='" style="width: 32px; height: 32px; border-radius: 6px;">` 
+          : `<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj48cGF0aCBkPSJNNTAgMTBDMjIuNCAxMCAxMCAzMi40IDEwIDYwczEyLjQgNTAgMzAgNTA1MCAwIDUwLTEyLjQgNTAtMzAgNTAtNTAtMTIuNC01MC0zMHoiIGZpbGw9IiMwMDAiLz48cGF0aCBkPSJNNTAgMzBDNjAuNSAzMCA3MCA0MC41IDcwIDU1czEtMTAgLTAtMjVTMzkuNSAzMCA1MCAzM3oiIGZpbGw9IiMzNzlhZDUiLz48L3N2Zz4='" style="width: 32px; height: 32px; border-radius: 6px;">`;
+        
+        // 生成描述HTML（只有当描述不是"版本: xxx"时才显示）
+        let descriptionText = applet.description || '';
+        // 如果描述超过18个字，截断并添加省略号
+        if (descriptionText.length > 18) {
+          descriptionText = descriptionText.substring(0, 18) + '....';
+        }
+        // 显示描述（即使为空也占一行）
+        const descriptionHtml = !applet.description || applet.description.startsWith('版本:')
+          ? `<div class="applet-card-description">&nbsp;</div>`
+          : `<div class="applet-card-description">${descriptionText}</div>`;
+        
+        appletCard.innerHTML = `
+          <div class="applet-card-header">
+            ${avatarHtml}
+            <div class="applet-card-info">
+              <div class="applet-card-title">${applet.name}</div>
+              <div class="applet-card-appid">AppID: ${applet.appid}</div>
+            </div>
+          </div>
+          ${descriptionHtml}
+          <div class="applet-card-meta">
+            <div>主体名称: ${applet.principal_name || ''}</div>
+            <div>修改时间: ${new Date(applet.modified).toLocaleString()}</div>
+          </div>
+          <div class="applet-card-actions">
+            <button class="btn btn-sm btn-primary" onclick="decompileApp('${safePath}', '${applet.appid}', '${safeDecompilePath}')">反编译</button>
+            <button class="btn btn-sm btn-secondary" onclick="openFolder('${safeOutputDirPath}')">打开</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteAppletFolder('${safeDecompilePath}', '${applet.appid}')">删除Appid目录</button>
+            <button class="btn btn-sm btn-warning" onclick="deleteOutputFolder('${safeOutputDirPath}', '${applet.appid}')">删除反编译目录</button>
+          </div>
+        `;
+        
+        // 添加已反编译标记
+        if (isDecompiled) {
+          const successMark = document.createElement('div');
+          successMark.className = 'success-mark';
+          successMark.textContent = '✓ 已反编译';
+          successMark.style.cssText = `
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #4CAF50;
+            color: white;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            z-index: 10;
+          `;
+          appletCard.style.position = 'relative';
+          appletCard.appendChild(successMark);
+        }
+        
+        appletGrid.appendChild(appletCard);
+      });
+    }
+
+    // 反编译小程序
+    async function decompileApp(path, appid, decompilePath) {
+      try {
+        // 获取配置参数
+        const config = getConfig();
+        
+        // 显示加载状态
+        const buttons = document.querySelectorAll(`.applet-card[data-appid="${appid}"] .btn`);
+        const originalTexts = {};
+        buttons.forEach((btn, index) => {
+          originalTexts[index] = btn.textContent;
+          btn.disabled = true;
+          if (btn.textContent === '反编译') {
+            btn.textContent = '处理中';
+          }
+        });
+
+        // 执行反编译
+        const result = await fetch('/api/decompile/wxapkg', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            appid: appid,
+            wxapkgPath: path,
+            decompilePath: decompilePath,
+            outputDir: config.outputDir,
+            depth: parseInt(document.getElementById('searchDepth').value) || 5,
+            format: config.formatCode,
+            analyze: config.jsAnalysis,
+            analyzePort: config.analyzePort,
+            proxyPort: config.proxyPort
+          })
+        }).then(res => res.json());
+
+        // 恢复按钮状态
+        buttons.forEach((btn, index) => {
+          btn.disabled = false;
+          btn.textContent = originalTexts[index];
+        });
+
+        if (result.success) {
+          // 显示成功提示
+          // alert(`反编译成功！\n输出目录: ${result.outputPath}`);
+          
+          // 添加到已反编译集合
+          decompiledApplets.add(appid);
+          await addDecompiledApplet(appid);
+          
+          // 添加反编译成功标记
+          const appletCard = document.querySelector(`.applet-card[data-appid="${appid}"]`);
+          if (appletCard) {
+            // 检查是否已有标记
+            let successMark = appletCard.querySelector('.success-mark');
+            if (!successMark) {
+              successMark = document.createElement('div');
+              successMark.className = 'success-mark';
+              successMark.textContent = '✓ 已反编译';
+              successMark.style.cssText = `
+                position: absolute;
+                top: 10px;
+                right: 10px;
+                background-color: #4CAF50;
+                color: white;
+                padding: 2px 8px;
+                border-radius: 12px;
+                font-size: 12px;
+                font-weight: bold;
+                z-index: 10;
+              `;
+              appletCard.style.position = 'relative';
+              appletCard.appendChild(successMark);
+            }
+          }
+        } else {
+          alert(`反编译失败: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('反编译失败:', error);
+        alert(`反编译失败: ${error.message}`);
+      }
+    }
+
+    // 查看小程序详情
+    function viewDetails(path, appid) {
+      console.log('查看详情:', path, appid);
+      // 打开目录查看详情
+      openFolder(path);
+    }
+
+    // 打开文件夹
+    async function openFolder(path) {
+      try {
+        const result = await fetch('/api/shell/openDirectory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ dirPath: path })
+        }).then(res => res.json());
+        
+        if (!result.success) {
+          alert(`打开文件夹失败: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('打开文件夹失败:', error);
+        alert(`打开文件夹失败: ${error.message}`);
+      }
+    }
+
+    // 删除源目录（删除整个appid文件夹）
+    async function deleteAppletFolder(path, appid) {
+      // 计算appid文件夹路径（向上一级）
+      const appidPath = path.substring(0, path.lastIndexOf('\\'));
+      try {
+        const result = await fetch('/api/fs/deleteDirectory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ dirPath: appidPath })
+        }).then(res => res.json());
+        
+        if (result.success) {
+          // 从列表中移除该小程序
+          applets = applets.filter(a => a.appid !== appid);
+          // 从DOM中移除卡片
+          const card = document.querySelector(`.applet-card[data-appid="${appid}"]`);
+          if (card) {
+            card.remove();
+          }
+          // 如果列表为空，显示提示
+          if (applets.length === 0) {
+            const appletGrid = document.getElementById('appletGrid');
+            appletGrid.innerHTML = `
+              <div class="status-message">
+                <p>未找到小程序</p>
+                <p style="font-size: 0.75rem; margin-top: 0.5rem;">请确保目录包含小程序文件</p>
+              </div>
+            `;
+          }
+        } else {
+          alert(`删除失败: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('删除源目录失败:', error);
+        alert(`删除失败: ${error.message}`);
+      }
+    }
+
+    // 删除输出目录
+    async function deleteOutputFolder(path, appid) {
+      try {
+        const result = await fetch('/api/fs/deleteDirectory', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ dirPath: path })
+        }).then(res => res.json());
+        
+        if (result.success) {
+          // 从已反编译集合中移除
+          decompiledApplets.delete(appid);
+          await removeDecompiledApplet(appid);
+          // 移除已反编译标记
+          const card = document.querySelector(`.applet-card[data-appid="${appid}"]`);
+          if (card) {
+            const mark = card.querySelector('.success-mark');
+            if (mark) {
+              mark.remove();
+            }
+          }
+        } else {
+          alert(`删除失败: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('删除输出目录失败:', error);
+        alert(`删除失败: ${error.message}`);
+      }
+    }
+
+    // 获取配置
+    function getConfig() {
+      return {
+        outputDir: document.getElementById('outputDir').value || '',
+        formatCode: document.getElementById('formatCode').checked,
+        jsAnalysis: document.getElementById('jsAnalysis').checked,
+        analyzePort: parseInt(document.getElementById('analyzePort').value) || 8000,
+        proxyPort: parseInt(document.getElementById('proxyPort').value) || 8888
+      };
+    }
+  </script>
+</body>
+</html>
