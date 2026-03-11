@@ -1,11 +1,6 @@
 {
   "name": "AppletDeAnalyze",
-  "version": "1.1.0",
-  "main": "main.js",
-  "license": "GPL-3.0",
-  "scripts": {
-    "run": "ts-node -r tsconfig-paths/register --transpile-only src/index.ts"
-  },
+  "version": "1.2.0",
   "dependencies": {
     "@babel/core": "^7.21.3",
     "axios": "^1.13.5",
