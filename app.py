@@ -69,7 +69,7 @@ def main():
     server_process = start_node_server()
     
     # 等待服务器完全启动
-    time.sleep(2)
+    time.sleep(1)
     
     # 创建webview窗口
     print("创建WebView窗口...")

@@ -49,8 +49,20 @@ function isCacheExpired(cachedAt) {
   return cacheAge > maxAge;
 }
 
+// 验证appid格式
+function isValidAppId(appid) {
+  // 微信小程序appid通常以wx开头，后面跟着字母和数字，固定长度为18位
+  return typeof appid === 'string' && /^wx[a-zA-Z0-9]{16}$/.test(appid);
+}
+
 // 获取小程序信息（带缓存）
 async function getAppletInfo(appid) {
+  // 验证appid格式
+  if (!isValidAppId(appid)) {
+    console.log(`无效的appid格式: ${appid}，跳过API调用`);
+    return null;
+  }
+  
   // 先从数据库查询
   const cached = getAppletInfoFromDB(appid);
   if (cached && !isCacheExpired(cached.cachedAt)) {
@@ -193,54 +205,7 @@ const removeDecompiledApplet = (appid) => {
   }
 };
 
-// 查找本地头像
-function findLocalAvatar(appid, packagesDir) {
-  try {
-    // 从packages目录路径中提取基础路径
-    const baseDir = path.dirname(packagesDir);
-    const iconDir = path.join(baseDir, 'icon');
-    
-    // 检查icon目录是否存在
-    if (!fs.existsSync(iconDir)) {
-      return null;
-    }
-    
-    // 读取icon目录下的所有文件
-    const files = fs.readdirSync(iconDir);
-    
-    // 查找以appid开头的图片文件
-    const avatarFile = files.find(file => 
-      file.startsWith(appid + '_') && 
-      (file.endsWith('.png') || file.endsWith('.jpg') || file.endsWith('.jpeg') || file.endsWith('.webp'))
-    );
-    
-    if (avatarFile) {
-      return path.join(iconDir, avatarFile);
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('查找本地头像失败:', error);
-    return null;
-  }
-}
 
-// 查找自定义头像（程序根目录下logo.svg）
-function findCustomAvatar() {
-  try {
-    const customAvatarPath = path.join(__dirname, 'logo.svg');
-    
-    // 检查自定义头像是否存在
-    if (fs.existsSync(customAvatarPath)) {
-      return customAvatarPath;
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('查找自定义头像失败:', error);
-    return null;
-  }
-}
 
 // 获取小程序头像（按优先级）
 async function getAppletAvatar(appid, packagesDir, apiAvatar) {
@@ -248,16 +213,9 @@ async function getAppletAvatar(appid, packagesDir, apiAvatar) {
   if (apiAvatar) {
     console.log(`使用API头像: ${apiAvatar}`);
     return apiAvatar;
-  }
-  
-  // 优先级2：查找程序根目录下的logo.png
-  const customAvatar = findCustomAvatar();
-  if (customAvatar) {
-    console.log(`使用自定义头像: ${customAvatar}`);
-    return customAvatar;
-  }
-  
-  return '';
+  }else {
+      return 'https://wx.qlogo.cn/mmhead/Q3auHgzwzM7Fll3F71bOWuUvJCZWo1yia2gtXmiaDMcAC0hIsAgJ2UlQ/0';
+    }
 }
 
 // 分析目录
@@ -346,6 +304,12 @@ async function openDirectory(dirPath) {
     }
     
     console.log('打开目录:', targetPath);
+    
+    // 检查目录是否存在
+    if (!fs.existsSync(targetPath)) {
+      console.error('目录不存在:', targetPath);
+      return { success: false, error: '目录不存在' };
+    }
     
     // 根据操作系统打开目录
     if (process.platform === 'win32') {
@@ -533,11 +497,19 @@ async function decompile(options) {
         timeout: 120000, // 2分钟超时
       }, (error, stdout, stderr) => {
         console.log('=== 反编译完成 ===');
+        
+        // 过滤掉ANSI转义序列，避免乱码
+        function removeAnsiEscapeCodes(str) {
+          return str.replace(/\x1B\[[0-9;]*[mGJK]/g, '');
+        }
+        
         if (stdout) {
-          console.log('标准输出:', stdout);
+          const cleanStdout = removeAnsiEscapeCodes(stdout);
+          console.log('标准输出:', cleanStdout);
         }
         if (stderr) {
-          console.log('标准错误:', stderr);
+          const cleanStderr = removeAnsiEscapeCodes(stderr);
+          console.log('标准错误:', cleanStderr);
         }
         console.log('输出目录:', finalOutputDir);
         
@@ -553,7 +525,7 @@ async function decompile(options) {
           resolve({
             success: true,
             message: '反编译成功',
-            output: stdout,
+            output: removeAnsiEscapeCodes(stdout),
             outputPath: finalOutputDir
           });
         }
@@ -666,6 +638,9 @@ async function handleApiRequest(req, res, pathname) {
         removeDecompiledApplet(data.appid);
         result = { success: true };
         break;
+      case '/api/locate/appletDirectory':
+        result = await locateAppletDirectory();
+        break;
       default:
         result = { success: false, error: 'API路径不存在' };
     }
@@ -776,10 +751,10 @@ function watchDirectory(dirPath) {
     
     console.log(`开始监听目录: ${dirPath}`);
     
-    // 监听目录变化
-    const watcher = fs.watch(dirPath, { recursive: true }, async (eventType, filename) => {
+    // 监听目录变化（只监听一级目录）
+    const watcher = fs.watch(dirPath, { recursive: false }, async (eventType, filename) => {
       // 只处理创建事件
-      if (eventType === 'change' || eventType === 'rename') {
+      if (eventType === 'change') {
         console.log(`目录变化: ${eventType} - ${filename}`);
         
         // 清除之前的定时器
@@ -787,7 +762,7 @@ function watchDirectory(dirPath) {
           clearTimeout(directoryChangeTimers.get(dirPath));
         }
         
-        // 设置新的定时器，3秒后处理
+        // 设置新的定时器，1秒后处理
         directoryChangeTimers.set(dirPath, setTimeout(async () => {
           try {
             console.log('执行目录分析...');
@@ -804,7 +779,7 @@ function watchDirectory(dirPath) {
           } catch (error) {
             console.error('分析目录失败:', error);
           }
-        }, 3000));
+        }, 1000));
       }
     });
     
@@ -830,6 +805,113 @@ function stopWatchingDirectory(dirPath) {
   }
 }
 
+// 定位小程序目录
+async function locateAppletDirectory() {
+  try {
+    console.log('开始定位小程序目录...');
+    
+    // 定义不同微信版本的可能路径模式
+    const pathPatterns = [
+      // 新版本微信路径
+      'C:\\Users\\{username}\\AppData\\Roaming\\Tencent\\WeChat\\XPlugin\\Plugins\\WeChatAppEx',
+      // 旧版本微信路径
+      'C:\\Users\\{username}\\AppData\\Roaming\\Tencent\\xwechat\\radium\\users',
+      // 通用路径模式
+      'C:\\Users\\{username}\\AppData\\Roaming\\Tencent'
+    ];
+    
+    // 获取当前用户名
+    const username = process.env.USERNAME || 'admin';
+    
+    // 扩展路径模式，替换{username}占位符
+    const expandedPatterns = [];
+    pathPatterns.forEach(pattern => {
+      expandedPatterns.push(pattern.replace('{username}', username));
+    });
+    
+    // 存储找到的所有小程序目录
+    const foundDirectories = [];
+    
+    // 检查所有扩展后的路径
+    for (const basePath of expandedPatterns) {
+      if (fs.existsSync(basePath)) {
+        console.log('检查路径:', basePath);
+        
+        // 递归搜索小程序目录
+        searchForAppletDirectories(basePath, foundDirectories);
+      }
+    }
+    
+    // 如果找到多个目录，选择包含最多小程序的目录
+    if (foundDirectories.length > 0) {
+      // 按小程序数量排序
+      foundDirectories.sort((a, b) => b.appletCount - a.appletCount);
+      
+      const bestMatch = foundDirectories[0];
+      console.log('找到最佳小程序目录:', bestMatch.path);
+      return {
+        success: true,
+        path: bestMatch.path,
+        fullPath: bestMatch.path,
+        appletCount: bestMatch.appletCount
+      };
+    }
+    
+    // 如果没有找到，返回错误
+    console.log('未找到小程序目录');
+    return {
+      success: false,
+      error: '未找到小程序目录，请手动输入路径'
+    };
+  } catch (error) {
+    console.error('定位小程序目录失败:', error);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// 递归搜索小程序目录
+function searchForAppletDirectories(dir, foundDirectories) {
+  try {
+    const files = fs.readdirSync(dir, { withFileTypes: true });
+    
+    for (const file of files) {
+      const filePath = path.join(dir, file.name);
+      
+      if (file.isDirectory()) {
+        // 检查是否是applet目录（不区分大小写）
+        if (file.name.toLowerCase() === 'applet') {
+          // 检查applet目录下是否有packages目录
+          const appletPath = filePath;
+          const packagesPath = path.join(appletPath, 'packages');
+          
+          if (fs.existsSync(packagesPath) && fs.statSync(packagesPath).isDirectory()) {
+            // 检查是否包含小程序目录
+            const appletDirs = fs.readdirSync(packagesPath, { withFileTypes: true })
+              .filter(f => f.isDirectory())
+              .map(f => f.name);
+            
+            if (appletDirs.length > 0) {
+              foundDirectories.push({
+                path: packagesPath,
+                appletCount: appletDirs.length
+              });
+            }
+          }
+        }
+        
+        // 继续递归搜索
+        searchForAppletDirectories(filePath, foundDirectories);
+      }
+    }
+  } catch (error) {
+    // 忽略权限错误等
+    console.debug('搜索目录时出错:', error.message);
+  }
+}
+
 // 处理头像代理请求
 function handleAvatarProxy(req, res, pathname) {
   try {
@@ -843,8 +925,7 @@ function handleAvatarProxy(req, res, pathname) {
       return;
     }
     
-    console.log(`代理头像请求: ${avatarUrl}`);
-    
+
     // 解析头像URL
     const parsedAvatarUrl = url.parse(avatarUrl);
     const protocol = parsedAvatarUrl.protocol === 'https:' ? require('https') : require('http');

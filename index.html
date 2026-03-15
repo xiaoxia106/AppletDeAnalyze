@@ -127,6 +127,17 @@
       padding: 16px;
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
       transition: box-shadow 0.2s, transform 0.2s;
+      user-select: text;
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+    }
+    
+    .applet-card * {
+      user-select: text;
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
     }
 
     .applet-card:hover {
@@ -338,18 +349,6 @@
 </head>
 <body>
   <div class="container">
-    <!-- 侧边栏已移除 -->
-
-    <!-- 主内容区 -->
-    <!-- <div class="main-content"> -->
-      <!-- 顶部导航栏 -->
-      <!-- <div class="top-bar"> -->
-        <!-- <div class="top-bar-title">小程序反编译工具</div> -->
-        <!-- <div class="top-bar-actions"> -->
-          <!-- 刷新和批量反编译功能暂时移除 -->
-        <!-- </div> -->
-      <!-- </div> -->
-
       <!-- 工作区 -->
       <div class="workspace">
         <!-- 左侧工作区 -->
@@ -565,23 +564,240 @@
     // 选择目录
     async function selectDirectory() {
       try {
-        // 由于不再使用Electron，这里使用prompt让用户手动输入目录路径
-        const directory = prompt('请输入小程序目录路径:');
-        if (directory) {
-          selectedDirectory = directory;
-          document.getElementById('directoryPath').value = directory;
-          
-          // 保存上次选择的目录
-          await fetch('/api/save/lastSelectedDirectory', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ directory })
+        // 创建自定义模态对话框
+        const modal = document.createElement('div');
+        modal.className = 'directory-modal';
+        modal.innerHTML = `
+          <div class="modal-content">
+            <h3>选择小程序目录</h3>
+            <div class="modal-body">
+              <label for="directory-input">请输入小程序目录路径:</label>
+              <input type="text" id="directory-input" placeholder="例如: C:\\Users\\admin\\AppData\\Roaming\\Tencent\\xwechat\\radium\\users" />
+              <div class="modal-actions">
+                <button id="modal-locate">自动定位小程序目录</button>
+              </div>
+            </div>
+            <div class="modal-footer">
+              <button id="modal-cancel">取消</button>
+              <button id="modal-confirm">确定</button>
+            </div>
+          </div>
+        `;
+        
+        // 添加样式
+        const style = document.createElement('style');
+        style.textContent = `
+          .directory-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+          }
+          .modal-content {
+            background-color: white;
+            border-radius: 8px;
+            padding: 20px;
+            width: 450px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+          }
+          .modal-content h3 {
+            margin-top: 0;
+            color: #333;
+            font-size: 18px;
+            font-weight: 600;
+          }
+          .modal-body {
+            margin: 20px 0;
+          }
+          .modal-body label {
+            display: block;
+            margin-bottom: 8px;
+            color: #666;
+            font-size: 14px;
+          }
+          .modal-body input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+          }
+          .modal-body input:focus {
+            outline: none;
+            border-color: #1890ff;
+            box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+          }
+          .modal-actions {
+            margin-top: 10px;
+          }
+          .modal-actions button {
+            width: 100%;
+            padding: 8px 16px;
+            border: 1px solid #1890ff;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+            background-color: white;
+            color: #1890ff;
+          }
+          .modal-actions button:hover {
+            background-color: #e6f7ff;
+          }
+          .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            margin-top: 10px;
+          }
+          .modal-footer button {
+            padding: 8px 16px;
+            border: 1px solid #d9d9d9;
+            border-radius: 4px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+          }
+          .modal-footer button:hover {
+            opacity: 0.8;
+          }
+          #modal-cancel {
+            background-color: white;
+            color: #666;
+          }
+          #modal-confirm {
+            background-color: #1890ff;
+            color: white;
+            border-color: #1890ff;
+          }
+        `;
+        
+        document.head.appendChild(style);
+        document.body.appendChild(modal);
+        
+        // 聚焦输入框
+        const input = modal.querySelector('#directory-input');
+        input.focus();
+        
+        // 返回Promise，等待用户操作
+        return new Promise((resolve) => {
+          // 自动定位按钮
+          modal.querySelector('#modal-locate').addEventListener('click', async () => {
+            try {
+              // 显示加载状态
+              const locateButton = modal.querySelector('#modal-locate');
+              const originalText = locateButton.textContent;
+              locateButton.textContent = '定位中...';
+              locateButton.disabled = true;
+              
+              // 调用API定位小程序目录
+              const response = await fetch('/api/locate/appletDirectory', {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              const result = await response.json();
+              if (result.success) {
+                // 填充找到的目录路径
+                input.value = result.path;
+                alert('成功定位到小程序目录！');
+              } else {
+                alert('定位失败: ' + result.error);
+              }
+              
+              // 恢复按钮状态
+              locateButton.textContent = originalText;
+              locateButton.disabled = false;
+            } catch (error) {
+              console.error('定位目录失败:', error);
+              alert('定位失败: ' + error.message);
+            }
           });
           
-          await reloadDirectory();
-        }
+          // 取消按钮
+          modal.querySelector('#modal-cancel').addEventListener('click', () => {
+            document.body.removeChild(modal);
+            document.head.removeChild(style);
+            resolve(null);
+          });
+          
+          // 确定按钮
+          modal.querySelector('#modal-confirm').addEventListener('click', async () => {
+            const directory = input.value.trim();
+            if (directory) {
+              selectedDirectory = directory;
+              document.getElementById('directoryPath').value = directory;
+              
+              // 保存上次选择的目录
+              await fetch('/api/save/lastSelectedDirectory', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ directory })
+              });
+              
+              await reloadDirectory();
+            }
+            document.body.removeChild(modal);
+            document.head.removeChild(style);
+            resolve(directory);
+          });
+          
+          // 点击模态框外部关闭
+          modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+              document.body.removeChild(modal);
+              document.head.removeChild(style);
+              resolve(null);
+            }
+          });
+          
+          // 按Esc键关闭
+          document.addEventListener('keydown', function handleEsc(e) {
+            if (e.key === 'Escape') {
+              document.body.removeChild(modal);
+              document.head.removeChild(style);
+              document.removeEventListener('keydown', handleEsc);
+              resolve(null);
+            }
+          });
+          
+          // 按Enter键确认
+          input.addEventListener('keydown', function handleEnter(e) {
+            if (e.key === 'Enter') {
+              const directory = input.value.trim();
+              if (directory) {
+                selectedDirectory = directory;
+                document.getElementById('directoryPath').value = directory;
+                
+                // 保存上次选择的目录
+                fetch('/api/save/lastSelectedDirectory', {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ directory })
+                });
+                
+                reloadDirectory();
+              }
+              document.body.removeChild(modal);
+              document.head.removeChild(style);
+              resolve(directory);
+            }
+          });
+        });
       } catch (error) {
         console.error('选择目录失败:', error);
       }
