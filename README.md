@@ -33,4 +33,6 @@
 
 勾选【JS分析】结合burpsuite+HaE插件实现敏感信息提取。首先在burpsuite中设置proxy settings中代理端口，再点击反编译按钮会将反编译后的js代码代理到burpsuite中。
 
+视频教程：【微信4.x小程序反编译分析js代码提取敏感信息】 https://www.bilibili.com/video/BV1MZZ1BWEci/?share_source=copy_web&vd_source=8e44b3ef29b07841fb501abc250af40a
+
 
